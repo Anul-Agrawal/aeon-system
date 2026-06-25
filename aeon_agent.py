@@ -14,7 +14,14 @@ import google.generativeai as genai
 #except KeyError:
 #    st.error("Missing 'API_KEY' in Streamlit Secrets. Please configure your secrets to continue.")
 #    st.stop()
-#DB_FILE = "aeon_persistent_vault.db"
+DB_FILE = "aeon_persistent_vault.db"
+try:
+    API_KEY = st.secrets["API_KEY"]
+except KeyError:
+    st.error("Missing 'API_KEY' in Streamlit Secrets.")
+    st.stop()
+
+genai.configure(api_key=API_KEY)
 #genai.configure(api_key=API_KEY)
 # ==========================================
 # ==========================================
