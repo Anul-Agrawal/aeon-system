@@ -16,9 +16,13 @@ import google.generativeai as genai
 #    st.stop()
 DB_FILE = "aeon_persistent_vault.db"
 try:
-    API_KEY = st.secrets["API_KEY"]
-except KeyError:
-    st.error("Missing 'API_KEY' in Streamlit Secrets.")
+    API_KEY = st.secrets.get("API_KEY") or os.environ.get("API_KEY")
+    if not API_KEY:
+        raise KeyError("API_KEY not found in secrets or environment.")
+    
+    genai.configure(api_key=API_KEY)
+except Exception as e:
+    st.error(f"Authentication Setup Failed: {e}")
     st.stop()
 
 genai.configure(api_key=API_KEY)
