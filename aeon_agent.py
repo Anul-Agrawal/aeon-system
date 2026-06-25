@@ -57,7 +57,7 @@ def init_db(force_reset=False):
     c.execute('''CREATE TABLE IF NOT EXISTS purchases 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, item_name TEXT, cost INTEGER, date_unlocked TEXT)''')
     
-    # --- AUTO-MIGRATION LAYER (Adds exotic trackers seamlessly) ---
+    # --- AUTO-MIGRATION LAYER (Adds trackers seamlessly) ---
     c.execute("PRAGMA table_info(character)")
     columns = [col[1] for col in c.fetchall()]
     
@@ -161,7 +161,7 @@ if "log" in st.query_params and "api_key" in st.query_params:
 # ==========================================
 # 🎨 RE-ENGINEERED IMMERSIVE UI STYLING
 # ==========================================
-st.set_page_config(page_title="AEON: Sovereign Interface", page_icon="⚡", layout="wide")
+st.set_page_config(page_title="AEON: Monarch Evolution Chronicles", page_icon="⚡", layout="wide")
 st.markdown("""
     <style>
     .main { background-color: #060913; color: #E2E8F0; }
@@ -201,7 +201,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-st.title("⚡ AEON // SOVEREIGN SYSTEM MATRIX")
+# Upgraded premium name display
+st.title("🔥 AEON // MONARCH EVOLUTION CHRONICLES")
 st.markdown(f"Target Sync: **ANUL AGRAWAL** | Assigned Title: <span class='title-badge'>{active_title}</span>", unsafe_allow_html=True)
 
 # Level Breakthrough Parameter Verification
@@ -230,12 +231,21 @@ if char_data['xp'] >= xp_needed and all_stats_met:
     st.rerun()
 
 # ==========================================
+# 🛡️ SYSTEM KEY INTEGRATION AUTOMATION
+# ==========================================
+# Automated secrets fallback so you never have to re-enter your key!
+gemini_api_key = ""
+if "GEMINI_API_KEY" in st.secrets:
+    gemini_api_key = st.secrets["GEMINI_API_KEY"]
+
+# ==========================================
 # 🗺️ APPARATUS TABS INTERACTION INTERFACE
 # ==========================================
-tab_dashboard, tab_shop, tab_gacha, tab_remote = st.tabs([
+tab_dashboard, tab_shop, tab_gacha, tab_forge, tab_remote = st.tabs([
     "🛡️ STATUS MATRIX & DIRECTIVES", 
     "🪙 SYSTEM SHOP & INVENTORY", 
     "🔮 THE ORACLE'S RUNES (GACHA)",
+    "🔧 AEON FORGE (DYNAMIC EXPANSION)",
     "📡 REMOTE API GATEWAY"
 ])
 
@@ -376,16 +386,23 @@ with tab_dashboard:
 
         st.markdown("---")
         st.header("🔮 COGNITIVE SYNAPSE LOG TERMINAL")
-        api_token = st.text_input("Enter Neural Authentication String (Gemini API Key)", type="password")
+        
+        # Key fallback management UI
+        if gemini_api_key:
+            st.success("🔒 System Synchronization Security Token initialized dynamically from st.secrets.")
+            active_key = gemini_api_key
+        else:
+            active_key = st.text_input("Enter Neural Authentication String (Gemini API Key)", type="password")
+            
         raw_log = st.text_area("Dump processing logs here:", height=110, placeholder="Document raw daily telemetry configurations...")
         
         if st.button("Execute Core Analysis Run"):
-            if not api_token or not raw_log:
+            if not active_key or not raw_log:
                 st.error("Missing input parameters. Supply valid credentials and log context.")
             else:
                 with st.spinner("Analyzing semantic structures... Updating database matrix..."):
                     try:
-                        genai.configure(api_key=api_token)
+                        genai.configure(api_key=active_key)
                         current_matrix_payload = {
                             "level": int(char_data['level']), "str": int(char_data['str']), "agi": int(char_data['agi']),
                             "vit": int(char_data['vit']), "intel": int(char_data['intel']), "per": int(char_data['per']),
@@ -401,9 +418,10 @@ with tab_dashboard:
                         
                         TASK SPECIFICATIONS:
                         1. Calculate metric shifting arrays (-5 to +5) across all coefficients based on the user's report.
-                        2. Award appropriate INT/STR/WTH points based on accomplishments, and generate positive experience multipliers.
-                        3. If they mention late night screen loops, masturbation/dopamine failures, or procrastination, apply a major penalty to VIT and PER.
-                        4. DYNAMIC QUESTS: If they mention specific goals, failures, or milestones, generate an active side quest. 
+                        2. Award STR (Strength) when physical exertion/workouts/gym/pushups/swimming are logged.
+                        3. Award WTH (Wealth) when financial discipline (mutual funds target met, overtime, savings, resisting junk food apps) is mentioned.
+                        4. If they mention late night screen loops, masturbation/dopamine failures, or procrastination, apply a major penalty to VIT and PER.
+                        5. DYNAMIC QUESTS: If they mention specific goals, failures, or milestones, generate an active side quest. 
                            The difficulty rank, requirements, and deadlines of the side quest MUST scale based on the user's current Level ({char_data['level']}):
                            - Level 1-2: E/D-Rank Quests (Simple habits, 100-150 XP, 3-5 days)
                            - Level 3-4: C/B-Rank Quests (Multi-step structural shifts, 200-300 XP, 4-7 days)
@@ -578,7 +596,40 @@ with tab_gacha:
         </div>
         """, unsafe_allow_html=True)
 
-# --- TAB 4: REMOTE GATEWAY TERMINAL ---
+# --- TAB 4: 🔧 AEON FORGE (DYNAMIC EXPANSION TAB) ---
+with tab_forge:
+    st.header("🔧 AEON FORGE")
+    st.caption("Request dynamic software patches, feature overlays, or customized RPG modules directly from your system UI.")
+    
+    forge_req = st.text_area("What modular system expansion or graphic asset would you like to install?", placeholder="e.g., 'Add a deep water hydration tracking widget to the dashboard panel that awards +5 VIT for clearing 3L.'")
+    
+    if st.button("Initialize System Blueprint Generation"):
+        if not active_key or not forge_req:
+            st.error("Expansion compilation failed: Authentication string or requirements empty.")
+        else:
+            with st.spinner("Compiling structural blueprint layers... Reading Canvas interfaces..."):
+                try:
+                    genai.configure(api_key=active_key)
+                    forge_prompt = f"""
+                    You are AEON Forge, a world-class Streamlit and Python engineer. 
+                    The user Anul Agrawal has requested a new feature for his dashboard app.
+                    
+                    USER FEATURE REQUEST:
+                    "{forge_req}"
+                    
+                    TASK: Generate the complete, optimized code patch or instructions that they can safely replace in their app.
+                    Keep the style cohesive, clean, and highly robust.
+                    """
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model.generate_content(forge_prompt)
+                    
+                    st.markdown("### 🧬 PATCH GENERATED SUCCESSFULLY")
+                    st.info("Copy the following code configuration directly into your local codebase workspace.")
+                    st.code(response.text, language="python")
+                except Exception as e:
+                    st.error(f"Forge expansion compiled with structural failure: {e}")
+
+# --- TAB 5: REMOTE GATEWAY TERMINAL ---
 with tab_remote:
     st.header("📡 WEBHOOK TRANSMISSION GATEWAY")
     st.caption("Bypass the standard graphic web dashboard interface entirely. Sync telemetry natively from remote environments.")
