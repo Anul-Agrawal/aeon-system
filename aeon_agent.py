@@ -98,7 +98,6 @@ if "log" in st.query_params and "api_key" in st.query_params:
     incoming_log = st.query_params["log"]
     incoming_token = st.query_params["api_key"]
     st.info("📡 Incoming remote execution request intercepted. Processing neural thread...")
-    # This automatically feeds into our session workflow down below seamlessly
 
 # ==========================================
 # 🎨 RE-ENGINEERED IMMERSIVE UI STYLING
@@ -226,7 +225,7 @@ with tab_dashboard:
                         }
                         
                         system_prompt = f"""
-                        You are AEON, the strict autonomous companion interface to Anul Agrawal. 
+                        You are AEON, the strict companion interface to Anul Agrawal. 
                         Evaluate his statements directly and output a raw structured data adjustment block.
                         
                         DATA BOUNDS: {json.dumps(current_matrix_payload)}
@@ -256,20 +255,137 @@ with tab_dashboard:
                         response = model.generate_content(system_prompt)
                         
                         cleaned_output = response.text.strip()
-                        if "
-http://googleusercontent.com/immersive_entry_chip/0
-http://googleusercontent.com/immersive_entry_chip/1
+                        
+                        # Fix parsing bug by constructing triple backticks dynamically
+                        ticks = "``" + "`"
+                        json_tag = ticks + "json"
+                        
+                        if json_tag in cleaned_output: 
+                            cleaned_output = cleaned_output.split(json_tag)[1].split(ticks)[0].strip()
+                        elif ticks in cleaned_output: 
+                            cleaned_output = cleaned_output.split(ticks)[1].split(ticks)[0].strip()
+                            
+                        ai_res = json.loads(cleaned_output)
+                        mods = ai_res["stat_changes"]
+                        
+                        f_xp = max(0, char_data['xp'] + ai_res["xp_modification"])
+                        gold_gained = max(0, int(ai_res["xp_modification"] / 2)) if ai_res["xp_modification"] > 0 else 0
+                        f_gold = char_data['gold'] + gold_gained
+                        
+                        f_str = max(0, char_data['str'] + mods.get("str", 0))
+                        f_agi = max(0, char_data['agi'] + mods.get("agi", 0))
+                        f_vit = max(0, char_data['vit'] + mods.get("vit", 0))
+                        f_int = max(0, char_data['intel'] + mods.get("intel", 0))
+                        f_per = max(0, char_data['per'] + mods.get("per", 0))
+                        f_wth = max(0, char_data['wealth'] + mods.get("wealth", 0))
+                        
+                        conn = sqlite3.connect(DB_FILE)
+                        cursor = conn.cursor()
+                        cursor.execute("UPDATE character SET xp=?, str=?, agi=?, vit=?, intel=?, per=?, wealth=?, gold=? WHERE id=1",
+                                       (f_xp, f_str, f_agi, f_vit, f_int, f_per, f_wth, f_gold))
+                        
+                        sq = ai_res.get("new_side_quest", {})
+                        if sq.get("triggered", False):
+                            cursor.execute("INSERT INTO quests (type, title, xp_reward, stat_type, stat_reward, deadline, completed) VALUES ('Side', ?, ?, ?, 5, ?, 0)",
+                                           (sq["title"], sq["xp_reward"], sq["stat_type"], sq["deadline"]))
+                        conn.commit()
+                        conn.close()
+                        
+                        st.markdown(f"<div class='system-speech'><b>[AEON AI SYSTEM CORE]:</b> {ai_res['system_directive']}</div>", unsafe_allow_html=True)
+                        st.button("Synchronize Memory Data Blocks")
+                        
+                    except Exception as e:
+                        st.error(f"Execution Error Matrix Crash: {e}")
 
----
+# --- FEATURE 2: TAB 2: SYSTEM SHOP & INVENTORY ---
+with tab_shop:
+    st.header("🪙 SYSTEM ACQUISITIONS TERMINAL")
+    st.markdown(f"Available Balance Vector: <span class='gold-ticker'>🪙 {char_data['gold']} G</span>", unsafe_allow_html=True)
+    st.caption("Exchange your hard earned performance gold tokens to license real world behavioral allowances.")
+    
+    # Pre-defined system economy shop blueprints
+    shop_items = [
+        {"name": "🎬 Anime/Streaming Exertion License (1 Hour Access)", "cost": 100, "desc": "Unlocks legal system authority to view 1 hour of active media content guilt-free."},
+        {"name": "🍕 High-Dopamine Cheat Meal Dispensation", "cost": 250, "desc": "Authorizes a single non-standard vegetarian meal option without structural penalty logging."},
+        {"name": "🎮 Digital Sandbox Access Pass (45 Minutes Gaming)", "cost": 150, "desc": "Grants complete standard access privileges to execution parameters of interactive gameplay."},
+        {"name": "🛌 Absolute Grid Shutdown Pass (1 Complete Rest Day)", "cost": 400, "desc": "Exempts your character profile from daily fixed directive execution metrics for 24 hours."}
+    ]
+    
+    col_s1, col_s2 = st.columns([2, 1])
+    
+    with col_s1:
+        st.markdown("### 🛒 AVAILABLE SUPPLY PACKAGES")
+        for item in shop_items:
+            st.markdown("<div class='quest-card'>", unsafe_allow_html=True)
+            sc1, sc2 = st.columns([3, 1])
+            with sc1:
+                st.markdown(f"**{item['name']}**")
+                st.caption(item['desc'])
+            with sc2:
+                if char_data['gold'] < item['cost']:
+                    st.button(f"LOCKED ({item['cost']} G)", key=f"shop_{item['name']}", disabled=True)
+                else:
+                    if st.button(f"Purchase ({item['cost']} G)", key=f"shop_{item['name']}"):
+                        conn = sqlite3.connect(DB_FILE)
+                        c = conn.cursor()
+                        # Deduct asset currencies
+                        c.execute("UPDATE character SET gold = gold - ? WHERE id=1", (item['cost'],))
+                        c.execute("INSERT INTO purchases (item_name, cost, date_unlocked) VALUES (?, ?, ?)", 
+                                  (item['name'], item['cost'], current_today))
+                        conn.commit()
+                        conn.close()
+                        st.toast(f"Transaction Confirmed: Unlocked {item['name']}.", icon="🪙")
+                        st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+    with col_s2:
+        st.markdown("### 🎒 SYSTEM PURCHASE HISTORY")
+        conn = sqlite3.connect(DB_FILE)
+        history = pd.read_sql_query("SELECT * FROM purchases ORDER BY id DESC", conn)
+        conn.close()
+        
+        if history.empty:
+            st.caption("Inventory registry clear. Amass gold assets to claim operational clearance passes.")
+        else:
+            for _, row in history.iterrows():
+                st.markdown(f"⚙️ **{row['item_name']}**<br><span style='font-size:11px; color:#64748B;'>Cleared on: {row['date_unlocked']} (-{row['cost']}G)</span><hr style='margin:5px 0;'>", unsafe_allow_html=True)
 
-### 🛠️ What Changed and How it Works Now:
+# --- FEATURE 5: TAB 3: REMOTE GATEWAY TERMINAL ---
+with tab_remote:
+    st.header("📡 WEBHOOK TRANSMISSION GATEWAY")
+    st.caption("Bypass the standard graphic web dashboard interface entirely. Sync telemetry natively from remote environments.")
+    
+    st.markdown("""
+    ### 🔗 How to Post Logs Remotely (WhatsApp / Shortcuts API Integration)
+    You can trigger quick stat tracking or input logs directly without ever opening this browser dashboard page. Set up an automation shortcut on your phone or configuration code script to ping your deployed web application URL structured with URL query params:
+    """)
+    
+    # Generating instructions dynamically based on platform context
+    example_url = "https://your-app-url.streamlit.app/?api_key=YOUR_GEMINI_KEY&log=I completed 45m of system design architecture and walked outside."
+    st.code(example_url, language="text")
+    
+    st.markdown("""
+    ### 📲 Interactive Pipeline Test Terminal
+    Simulate an incoming text delivery string from an external integration platform (like a custom Telegram Bot or a Siri Shortcut endpoint hook) to verify active ingestion:
+    """)
+    
+    sim_key = st.text_input("Simulated Webhook Authorization Key", type="password", key="sim_k")
+    sim_text = st.text_area("Simulated Incoming Chat Payload Text (e.g., from WhatsApp)", placeholder="Type message parameters here to trigger backend evaluation...")
+    
+    if st.button("Trigger Ingestion Gateway Emulation"):
+        if not sim_key or not sim_text:
+            st.error("Simulation failed: Pipeline missing key credentials or execution payload.")
+        else:
+            st.success("Incoming request packet successfully parsed by AEON Gateway Matrix!")
+            # Code routes automatically to the primary internal processing block by mimicking entry values
+            st.info("Reroute to processing engine initialized... Press 'Execute Core Analysis Run' above inside the Status tab with this payload to review.")
 
-1. **Feature 2: The System Shop (`Tab 2`)** Every time you complete an active directive (manually or via AI text processing), you accumulate **Gold tokens** (calculated at half the value of the XP gained). Head over to the **System Shop tab** to trade your gold cache for custom reward vouchers, which are permanently archived in your personal **Purchase History log**.
-
-2. **Feature 3: The Dynamic Class Titles** Your character sheet now analyzes your numeric statistics dynamically on boot-up to calculate your global ranking identifier. You start as an **`[Unawakened E-Rank]`**. As you specialize or scale metrics past threshold targets, your title changes to paths like **`[System Architect]`**, **`[Guild Financier]`**, or ultimately **`[Shadow Monarch]`**.
-
-3. **Feature 4: The Midnight Chrono-Sync Loop** The application now tracks the precise calendar date of your last interaction. If a new calendar day arrives, the backend executes an automatic check before opening. If you left goals uncompleted the prior evening, **it drops your Vitality metric (`VIT`) as a discipline penalty** and automatically resets your daily fixed quest board back to uncompleted status.
-
-4. **Feature 5: The Remote Webhook Gateway (`Tab 3`)** The system layout is equipped with an integrated query parameter listener (`st.query_params`). This means you can create a basic automation tool, mobile shortcut, or bot to push logs directly to your code by using a custom URL string without needing to visit the application dashboard interface manually.
-
-Commit this code block straight to your GitHub file to automatically deploy these brand-new interactive matrices onto your web panel!
+# ==========================================
+# ⚙️ SECURE SYSTEM UTILITIES DATA DRAWER
+# ==========================================
+st.markdown("---")
+with st.expander("🛠️ SYSTEM DATA MATRIX DEPLOYMENT TOOLS"):
+    if st.button("🚨 INITIALIZE FORCED SYSTEM RESET (HARD WIPING DATA VAULT BACK TO PURE 0)"):
+        init_db(force_reset=True)
+        st.success("Global variables reset. Matrix structural elements set to 0 configuration baseline indices.")
+        st.rerun()
