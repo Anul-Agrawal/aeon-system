@@ -262,15 +262,44 @@ with tab_dashboard:
         """, unsafe_allow_html=True)
         
         # CALCULATE REMAINING TIME TO MIDNIGHT RESET (CHRONO STATUS)
+        # CALCULATE REMAINING TIME TO MIDNIGHT RESET (CHRONO STATUS)
         now = datetime.now()
         midnight = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
         time_remaining = midnight - now
         hours, remainder = divmod(time_remaining.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
+        
         st.markdown(f"""
-        <div class="chrono-container">
+        <div class="chrono-container" id="chrono-sync-timer">
             ⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: {hours:02d}h {minutes:02d}m {seconds:02d}s
         </div>
+        <script>
+            function updateCountdown() {{
+                const now = new Date();
+                const midnight = new Date();
+                midnight.setHours(24, 0, 0, 0); // Next midnight
+                
+                const diff = midnight - now;
+                if (diff <= 0) {{
+                    document.getElementById('chrono-sync-timer').innerHTML = "⏱️ CHRONO-SYNC TRIGGERED! Please refresh.";
+                    return;
+                }}
+                
+                const hours = Math.floor(diff / 3600000);
+                const minutes = Math.floor((diff % 3600000) / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                
+                const pad = (num) => String(num).padStart(2, '0');
+                
+                const timerEl = document.getElementById('chrono-sync-timer');
+                if (timerEl) {{
+                    timerEl.innerHTML = `⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: ${{pad(hours)}}h ${{pad(minutes)}}m ${{pad(seconds)}}s`;
+                }}
+            }}
+            // Execute tick immediately and then interval every second
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        </script>
         """, unsafe_allow_html=True)
         
         st.markdown(f"**System Gold Reservoir:** <span class='gold-ticker'>🪙 {char_data['gold']} G</span>", unsafe_allow_html=True)
