@@ -442,7 +442,7 @@ with tab_dashboard:
                             "system_directive": "Your strict commentary statement here."
                         }}
                         """
-                        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+                        model = genai.GenerativeModel('gemini-1.5-flash')
                         response = model.generate_content(system_prompt)
                         
                         cleaned_output = response.text.strip()
@@ -628,7 +628,7 @@ with tab_forge:
                     Keep the style cohesive, clean, and highly robust.
                     """
                     # CORRECTION: Explicitly routed to globally declared API_KEY configuration to guarantee authorization
-                    model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
+                    model = genai.GenerativeModel('gemini-1.5-flash')
                     response = model.generate_content(forge_prompt)
                     
                     st.markdown("### 🧬 PATCH GENERATED SUCCESSFULLY")
