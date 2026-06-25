@@ -166,15 +166,36 @@ st.markdown("""
     <style>
     .main { background-color: #060913; color: #E2E8F0; }
     .stApp { background-color: #060913; }
+    
+    /* Immersive Panels */
     .status-frame { background-color: #0F1322; padding: 25px; border-radius: 12px; border: 2px solid #1E293B; box-shadow: 0 0 20px rgba(56, 189, 248, 0.15); }
     .title-badge { color: #38BDF8; font-weight: bold; background: #161C2E; padding: 4px 10px; border-radius: 4px; border: 1px solid #38BDF8; font-family: monospace; }
-    .quest-card { background-color: #111625; padding: 18px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #1E293B; }
+    
+    /* Enhanced Quest Card Layout */
+    .quest-card { background-color: #111625; padding: 20px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #1E293B; box-shadow: 2px 2px 8px rgba(0,0,0,0.4); }
+    .quest-title-text { font-family: 'Courier New', monospace; font-size: 16px; font-weight: bold; color: #F1F5F9; }
+    .quest-breakdown { background-color: #0A0D18; border-radius: 6px; padding: 10px 12px; margin-top: 8px; border: 1px solid #1E243A; }
+    
+    /* Custom Neon Progress Bars */
+    .rpg-stat-container { margin-bottom: 15px; }
+    .rpg-stat-header { display: flex; justify-content: space-between; font-family: monospace; font-weight: bold; font-size: 14px; margin-bottom: 4px; }
+    .rpg-bar-bg { background-color: #1E293B; border-radius: 6px; height: 18px; width: 100%; overflow: hidden; border: 1px solid #334155; position: relative; }
+    .rpg-bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s ease-in-out; position: relative; }
+    .rpg-bar-gate { position: absolute; top: 0; width: 3px; height: 100%; background-color: #EF4444; box-shadow: 0 0 8px #EF4444; }
+    
     .system-speech { background-color: #1E1B4B; border-left: 4px solid #818CF8; padding: 18px; border-radius: 6px; font-family: 'Courier New', monospace; color: #E0E7FF; }
     .gold-ticker { color: #F59E0B; font-size: 20px; font-weight: bold; font-family: monospace; }
     .streak-container { display: flex; align-items: center; background: linear-gradient(135deg, #FF512F, #DD2476); padding: 8px 15px; border-radius: 8px; color: white; font-weight: bold; margin-bottom: 15px; }
-    .boss-frame { background-color: #1c0f1e; border: 2px solid #f43f5e; border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center; }
+    
+    /* Custom Boss Combat Section */
+    .boss-frame { background-color: #1c0f1e; border: 2px solid #f43f5e; border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center; box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); }
+    .boss-health-bar { height: 22px; background-color: #2D142C; border: 1px solid #F43F5E; border-radius: 6px; position: relative; overflow: hidden; margin: 10px 0; }
+    .boss-health-fill { height: 100%; background: linear-gradient(to right, #9B1C31, #EF4444); width: 100%; transition: width 0.5s ease; }
+    .boss-health-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; line-height: 22px; font-weight: bold; color: white; font-family: monospace; }
+    
     .rune-unlocked { background: radial-gradient(circle, rgba(129,140,248,0.2) 0%, rgba(15,19,34,1) 100%); border: 2px dashed #818cf8; border-radius: 12px; padding: 25px; text-align: center; }
     h1, h2, h3 { font-family: 'Courier New', monospace; color: #F8FAFC; letter-spacing: 1px; }
+    
     .stButton>button { width: 100%; background-color: #1E293B; color: #F1F5F9; border: 1px solid #38BDF8; border-radius: 6px; }
     .stButton>button:hover { background-color: #38BDF8; color: #060913; box-shadow: 0 0 12px #38BDF8; }
     </style>
@@ -239,17 +260,40 @@ with tab_dashboard:
         st.write(f"**Required Progress Vector (XP):** {char_data['xp']} / {xp_needed}")
         st.progress(xp_progress)
         
-        # Real-Time Linear Matrix Graph Visual Representation
-        st.markdown("### 📊 SYSTEM ATTRIBUTE PROGRESS REGISTRY")
-        stat_labels = ["STR", "AGI", "VIT", "INT", "PER", "WTH"]
-        stat_scores = [char_data['str'], char_data['agi'], char_data['vit'], char_data['intel'], char_data['per'], char_data['wealth']]
+        # --- EXOTIC CUSTOM PROGRESSION GRIDS (REPLACES STREAMLIT BAR CHART) ---
+        st.markdown("### 📊 RPG ATTRIBUTE CALIBRATION PANEL")
+        st.caption(f"Current Level Gating Limit: **{stat_gate}** points. Red marker designates mandatory gate breakthrough lines.")
         
-        chart_dataframe = pd.DataFrame({
-            "Current Score": stat_scores,
-            "Target Gate Requirement": [stat_gate] * 6
-        }, index=stat_labels)
+        # Helper list of attributes with names, values, colors, and gate values
+        attributes = [
+            {"label": "🏋️ STRENGTH (STR)", "val": char_data['str'], "color": "linear-gradient(90deg, #475569, #94A3B8)"},
+            {"label": "⚡ AGILITY (AGI)", "val": char_data['agi'], "color": "linear-gradient(90deg, #059669, #34D399)"},
+            {"label": "❤️ VITALITY (VIT)", "val": char_data['vit'], "color": "linear-gradient(90deg, #DC2626, #F87171)"},
+            {"label": "🧠 INTELLIGENCE (INT)", "val": char_data['intel'], "color": "linear-gradient(90deg, #4F46E5, #818CF8)"},
+            {"label": "👁️ PERCEPTION (PER)", "val": char_data['per'], "color": "linear-gradient(90deg, #0891B2, #22D3EE)"},
+            {"label": "🪙 WEALTH CAPACITY (WTH)", "val": char_data['wealth'], "color": "linear-gradient(90deg, #D97706, #FBBF24)"}
+        ]
         
-        st.bar_chart(chart_dataframe, color=["#38BDF8", "#F43F5E"])
+        for attr in attributes:
+            # We map 0-100% relative to a dynamic scale. Let's make max scale = max(stat_gate * 1.5, attr['val'])
+            max_scale = max(int(stat_gate * 1.5), attr['val'], 1)
+            fill_pct = min(100, int((attr['val'] / max_scale) * 100))
+            gate_pct = min(100, int((stat_gate / max_scale) * 100))
+            
+            gate_color = "#10B981" if attr['val'] >= stat_gate else "#EF4444"
+            st.markdown(f"""
+            <div class="rpg-stat-container">
+                <div class="rpg-stat-header">
+                    <span style="color:#CBD5E1;">{attr['label']}</span>
+                    <span style="color:{gate_color};">{attr['val']} / {stat_gate} G</span>
+                </div>
+                <div class="rpg-bar-bg">
+                    <div class="rpg-bar-fill" style="width: {fill_pct}%; background: {attr['color']};"></div>
+                    <div class="rpg-bar-gate" style="left: {gate_pct}%; background-color: {gate_color}; box-shadow: 0 0 8px {gate_color};"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
         st.markdown("</div>", unsafe_allow_html=True)
 
         # --- DYNAMIC BOSS BATTLE WINDOW ---
@@ -258,12 +302,19 @@ with tab_dashboard:
         st.markdown("**'The Stagnation Leviathan'**")
         
         boss_hp_val = int(char_data['boss_hp'])
-        st.progress(max(0, min(boss_hp_val, 100)) / 100.0)
+        boss_color = "#EF4444" if boss_hp_val > 0 else "#10B981"
+        
+        st.markdown(f"""
+        <div class="boss-health-bar">
+            <div class="boss-health-fill" style="width: {max(0, min(boss_hp_val, 100))}%; background: linear-gradient(to right, #9B1C31, {boss_color});"></div>
+            <div class="boss-health-text">BEAST HP: {boss_hp_val} / 100</div>
+        </div>
+        """, unsafe_allow_html=True)
         
         if boss_hp_val <= 0:
             st.markdown("<span style='color:#10B981; font-weight:bold;'>🏆 LEVIATHAN DEFEATED! Check in tomorrow for another raid drop.</span>", unsafe_allow_html=True)
         else:
-            st.markdown(f"**HP:** {boss_hp_val} / 100 — *Every Quest completed deals **25 DMG** to the Beast.*")
+            st.markdown(f"*Every completed objective deals **25 DMG** to the Beast.*")
         st.markdown("</div>", unsafe_allow_html=True)
 
     with col_right:
@@ -276,42 +327,52 @@ with tab_dashboard:
             st.info("Directives cleared. Complete neural text logs below to trigger dynamic side quests.")
         else:
             for _, q in active_quests.iterrows():
-                st.markdown("<div class='quest-card'>", unsafe_allow_html=True)
-                q_col1, q_col2 = st.columns([2.6, 1.4])
+                # Scale rewards with streak multipliers explicitly
+                scaled_xp = int(q['xp_reward'] * streak_multiplier)
+                gold_reward = int(scaled_xp / 2)
+                bonus_xp_only = scaled_xp - q['xp_reward']
                 
-                with q_col1:
-                    # Scaling rewards with active streak multiplier
-                    scaled_xp = int(q['xp_reward'] * streak_multiplier)
-                    gold_reward = int(scaled_xp / 2)
-                    st.markdown(f"**[{q['type']}]** {q['title']}")
-                    st.markdown(f"<span style='font-size:12px; color:#94A3B8;'>Rewards: +{scaled_xp} XP (with Multiplier) | +{gold_reward} GOLD</span>", unsafe_allow_html=True)
+                # --- IMMERSIVE QUEST CARD OVERHAUL ---
+                st.markdown(f"""
+                <div class='quest-card'>
+                    <div class="quest-title-text">[{q['type']}] {q['title']}</div>
+                    <div class="quest-breakdown">
+                        <table style="width:100%; border:none; background:none; font-family:monospace; font-size:12px; color:#94A3B8;">
+                            <tr style="border:none;"><td style="border:none; padding:2px;">Base Objective XP:</td><td style="border:none; text-align:right; color:#E2E8F0; padding:2px;">+{q['xp_reward']} XP</td></tr>
+                            <tr style="border:none;"><td style="border:none; padding:2px;">Streak Multiplier ({streak_multiplier:.2f}x):</td><td style="border:none; text-align:right; color:#EF4444; padding:2px;">+{bonus_xp_only} XP</td></tr>
+                            <tr style="border:none; border-bottom:1px solid #1E293B;"><td style="border:none; padding:2px;">Stat Reward:</td><td style="border:none; text-align:right; color:#38BDF8; padding:2px;">+{q['stat_reward']} {q['stat_type'].upper()}</td></tr>
+                            <tr style="border:none; font-weight:bold;"><td style="border:none; color:#F59E0B; padding:5px 2px 2px 2px;">Total Gold Yield (XP / 2):</td><td style="border:none; text-align:right; color:#F59E0B; padding:5px 2px 2px 2px;">🪙 {gold_reward} G</td></tr>
+                        </table>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
-                with q_col2:
-                    if st.button("Confirm Clear", key=f"btn_clear_{q['id']}"):
-                        conn = sqlite3.connect(DB_FILE)
-                        c = conn.cursor()
-                        c.execute("UPDATE quests SET completed=1 WHERE id=?", (q['id'],))
-                        db_stat = "intel" if q['stat_type'] == "int" else q['stat_type']
-                        
-                        # Apply adjusted stat and XP
-                        c.execute(f"UPDATE character SET xp = xp + ?, {db_stat} = {db_stat} + ?, gold = gold + ? WHERE id=1", 
-                                  (scaled_xp, q['stat_reward'], gold_reward))
-                        
-                        # Hit Daily Boss for 25 damage
-                        new_boss_hp = max(0, int(char_data['boss_hp']) - 25)
-                        c.execute("UPDATE character SET boss_hp = ? WHERE id=1", (new_boss_hp,))
-                        
-                        # Defeating the boss bonus
-                        if new_boss_hp == 0 and int(char_data['boss_hp']) > 0:
-                            c.execute("UPDATE character SET gold = gold + 50 WHERE id=1")
-                            st.sidebar.balloons()
-                            st.sidebar.success("💥 BOSS DEFEATED! Received +50 G Slayer Bonus!")
-                        
-                        conn.commit()
-                        conn.close()
-                        st.toast(f"Objective Verified: +{gold_reward} Gold added to cache.")
-                        st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
+                # Action Buttons are kept as native Streamlit elements right below the card for complete stability
+                if st.button("Confirm Objective Cleared", key=f"btn_clear_{q['id']}"):
+                    conn = sqlite3.connect(DB_FILE)
+                    c = conn.cursor()
+                    c.execute("UPDATE quests SET completed=1 WHERE id=?", (q['id'],))
+                    db_stat = "intel" if q['stat_type'] == "int" else q['stat_type']
+                    
+                    # Apply adjusted stat and XP
+                    c.execute(f"UPDATE character SET xp = xp + ?, {db_stat} = {db_stat} + ?, gold = gold + ? WHERE id=1", 
+                              (scaled_xp, q['stat_reward'], gold_reward))
+                    
+                    # Hit Daily Boss for 25 damage
+                    new_boss_hp = max(0, int(char_data['boss_hp']) - 25)
+                    c.execute("UPDATE character SET boss_hp = ? WHERE id=1", (new_boss_hp,))
+                    
+                    # Defeating the boss bonus
+                    if new_boss_hp == 0 and int(char_data['boss_hp']) > 0:
+                        c.execute("UPDATE character SET gold = gold + 50 WHERE id=1")
+                        st.sidebar.balloons()
+                        st.sidebar.success("💥 BOSS DEFEATED! Received +50 G Slayer Bonus!")
+                    
+                    conn.commit()
+                    conn.close()
+                    st.toast(f"Objective Verified: +{gold_reward} Gold added to cache.")
+                    st.rerun()
+                st.markdown("<div style='margin-bottom:15px;'></div>", unsafe_allow_html=True)
 
         st.markdown("---")
         st.header("🔮 COGNITIVE SYNAPSE LOG TERMINAL")
