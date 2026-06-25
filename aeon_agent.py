@@ -261,37 +261,25 @@ with tab_dashboard:
         </div>
         """, unsafe_allow_html=True)
         
-        # CLIENT-SIDE DYNAMIC LOCAL TIME COUNTDOWN (Prevents Server UTC Mismatch & Ticks Continuously)
+        # SERVER-SIDE LOCAL TIME COUNTDOWN + AUTO-REFRESH TRIGGER
+        # Streamlit servers run on UTC, so we shift by +5.5 hours to find local IST time natively.
+        utc_now = datetime.utcnow()
+        ist_now = utc_now + timedelta(hours=5, minutes=30)
+        ist_today = ist_now.date()
+        ist_midnight = datetime.combine(ist_today + timedelta(days=1), datetime.min.time())
+        time_remaining = ist_midnight - ist_now
+        
+        hours, remainder = divmod(time_remaining.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        # We inject an HTML refresh header that reloads the page in 5-minute (300-second) intervals.
+        # This completely bypasses Brave shields blocks and ensures your clock is always updated!
         st.markdown(f"""
-        <div class="chrono-container" id="local-chrono-timer">
-            ⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: Calculating...
+        <meta http-equiv="refresh" content="300">
+        <div class="chrono-container">
+            ⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN (IST): {hours:02d}h {minutes:02d}m {seconds:02d}s
+            <br><span style="font-size: 11px; opacity: 0.8; font-weight: normal;">(Auto-syncs every 5 minutes to bypass browser shielding block)</span>
         </div>
-        <script>
-            function updateLocalTimer() {{
-                const now = new Date();
-                const midnight = new Date();
-                midnight.setHours(24, 0, 0, 0); // User's Local Midnight (12:00 AM)
-                
-                const diff = midnight - now;
-                if (diff <= 0) {{
-                    document.getElementById('local-chrono-timer').innerHTML = "⏱️ CHRONO-SYNC ACTIVE! Please refresh to update boards.";
-                    return;
-                }}
-                
-                const hours = Math.floor(diff / 3600000);
-                const minutes = Math.floor((diff % 3600000) / 60000);
-                const seconds = Math.floor((diff % 60000) / 1000);
-                
-                const pad = (num) => String(num).padStart(2, '0');
-                
-                const timerElement = document.getElementById('local-chrono-timer');
-                if (timerElement) {{
-                    timerElement.innerHTML = `⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: ${{pad(hours)}}h ${{pad(minutes)}}m ${{pad(seconds)}}s`;
-                }}
-            }}
-            updateLocalTimer();
-            setInterval(updateLocalTimer, 1000);
-        </script>
         """, unsafe_allow_html=True)
         
         st.markdown(f"**System Gold Reservoir:** <span class='gold-ticker'>🪙 {char_data['gold']} G</span>", unsafe_allow_html=True)
