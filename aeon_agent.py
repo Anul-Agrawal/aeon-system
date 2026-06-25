@@ -647,7 +647,9 @@ with tab_remote:
     You can trigger quick stat tracking or input logs directly without ever opening this browser dashboard page. Set up an automation shortcut on your phone or configuration code script to ping your deployed web application URL structured with URL query params:
     """)
     
-    example_url = "https://aeon-forge.streamlit.app/?api_key=YOUR_GEMINI_KEY&log=I completed 45m of system design architecture and walked outside."
+    # Masking the API key in the URL for security
+    masked_key = f"{API_KEY[:5]}...{API_KEY[-5:]}"
+    example_url = f"https://aeon-forge.streamlit.app/?api_key={masked_key}&log=I completed 45m of system design architecture and walked outside."
     st.code(example_url, language="text")
     
     st.markdown("""
