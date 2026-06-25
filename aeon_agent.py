@@ -31,6 +31,21 @@ def init_db(force_reset=False):
     c.execute('''CREATE TABLE IF NOT EXISTS purchases 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, item_name TEXT, cost INTEGER, date_unlocked TEXT)''')
     
+    # --- AUTO-MIGRATION LAYER (Prevents KeyError crashes on older DB files) ---
+    c.execute("PRAGMA table_info(character)")
+    columns = [col[1] for col in c.fetchall()]
+    if 'gold' not in columns:
+        try:
+            c.execute("ALTER TABLE character ADD COLUMN gold INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+    if 'last_login' not in columns:
+        try:
+            c.execute("ALTER TABLE character ADD COLUMN last_login TEXT")
+            c.execute("UPDATE character SET last_login = ?", (date.today().strftime('%Y-%m-%d'),))
+        except sqlite3.OperationalError:
+            pass
+
     c.execute("SELECT COUNT(*) FROM character")
     if c.fetchone()[0] == 0:
         # Pinned Baseline: Pure 0 starting metrics on creation
