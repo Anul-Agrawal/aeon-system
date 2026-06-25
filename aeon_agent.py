@@ -2,13 +2,39 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import json
-from datetime import datetime, date
+import random
+from datetime import datetime, date, timedelta
 import google.generativeai as genai
 
 DB_FILE = "aeon_persistent_vault.db"
 
 # ==========================================
-# 🗄️ DATABASE MANAGEMENT LAYER (UPGRADED)
+# 📈 QUEST SCALING CONTROLLER (BY LEVEL TIER)
+# ==========================================
+def scale_quests_to_level(c, level):
+    # Wipe old Fixed daily quests to prepare for scaled iteration
+    c.execute("DELETE FROM quests WHERE type='Fixed'")
+    
+    # Calculate scaled parameters based on Level
+    sunlight_duration = 15 + (level - 1) * 5      # Lvl 1: 15m, Lvl 2: 20m, Lvl 3: 25m...
+    lockdown_cutoff = "11:00 PM" if level == 1 else "10:30 PM" if level == 2 else "10:00 PM" if level == 3 else "09:30 PM"
+    physical_duration = 30 + (level - 1) * 10     # Lvl 1: 30m, Lvl 2: 40m, Lvl 3: 50m...
+    study_duration = 45 + (level - 1) * 15        # Lvl 1: 45m, Lvl 2: 60m, Lvl 3: 75m...
+    
+    # Scale rewards proportional to level growth
+    xp_base = 40 + (level - 1) * 20
+    stat_base = 2 + (level - 1)
+    
+    quests = [
+        ('Fixed', f"🌅 Sunlight Spawn ({sunlight_duration}m outdoor morning exposure & breathing)", xp_base, 'per', stat_base, 'Daily', 0),
+        ('Fixed', f"🔒 System Lockdown (No late-night food delivery past {lockdown_cutoff})", xp_base + 10, 'vit', stat_base + 1, 'Daily', 0),
+        ('Fixed', f"🏊 Physical Execution ({physical_duration}m Swim/Walk/Active Mobility)", xp_base, 'agi', stat_base, 'Daily', 0),
+        ('Fixed', f"📈 Skill Tree Cultivation ({study_duration}m System Design/LeetCode/Engineering)", xp_base + 20, 'intel', stat_base + 1, 'Daily', 0)
+    ]
+    c.executemany("INSERT INTO quests (type, title, xp_reward, stat_type, stat_reward, deadline, completed) VALUES (?, ?, ?, ?, ?, ?, ?)", quests)
+
+# ==========================================
+# 🗄️ DATABASE MANAGEMENT LAYER (SCALING MATRIX UPDATE)
 # ==========================================
 def init_db(force_reset=False):
     conn = sqlite3.connect(DB_FILE)
@@ -22,7 +48,7 @@ def init_db(force_reset=False):
     c.execute('''CREATE TABLE IF NOT EXISTS character 
                  (id INTEGER PRIMARY KEY, level INTEGER, xp INTEGER, 
                   str INTEGER, agi INTEGER, vit INTEGER, intel INTEGER, per INTEGER, wealth INTEGER,
-                  gold INTEGER, last_login TEXT)''')
+                  gold INTEGER, last_login TEXT, streak INTEGER, draw_today INTEGER, boss_hp INTEGER)''')
                   
     c.execute('''CREATE TABLE IF NOT EXISTS quests 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, title TEXT, 
@@ -31,48 +57,63 @@ def init_db(force_reset=False):
     c.execute('''CREATE TABLE IF NOT EXISTS purchases 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, item_name TEXT, cost INTEGER, date_unlocked TEXT)''')
     
-    # --- AUTO-MIGRATION LAYER (Prevents KeyError crashes on older DB files) ---
+    # --- AUTO-MIGRATION LAYER (Adds exotic trackers seamlessly) ---
     c.execute("PRAGMA table_info(character)")
     columns = [col[1] for col in c.fetchall()]
-    if 'gold' not in columns:
-        try:
-            c.execute("ALTER TABLE character ADD COLUMN gold INTEGER DEFAULT 0")
-        except sqlite3.OperationalError:
-            pass
-    if 'last_login' not in columns:
-        try:
-            c.execute("ALTER TABLE character ADD COLUMN last_login TEXT")
-            c.execute("UPDATE character SET last_login = ?", (date.today().strftime('%Y-%m-%d'),))
-        except sqlite3.OperationalError:
-            pass
+    
+    migrations = {
+        'gold': "INTEGER DEFAULT 0",
+        'last_login': "TEXT",
+        'streak': "INTEGER DEFAULT 0",
+        'draw_today': "INTEGER DEFAULT 0",
+        'boss_hp': "INTEGER DEFAULT 100"
+    }
+    
+    for col_name, col_type in migrations.items():
+        if col_name not in columns:
+            try:
+                c.execute(f"ALTER TABLE character ADD COLUMN {col_name} {col_type}")
+                if col_name == 'last_login':
+                    c.execute("UPDATE character SET last_login = ?", (date.today().strftime('%Y-%m-%d'),))
+            except sqlite3.OperationalError:
+                pass
 
     c.execute("SELECT COUNT(*) FROM character")
     if c.fetchone()[0] == 0:
-        # Pinned Baseline: Pure 0 starting metrics on creation
-        c.execute("INSERT INTO character VALUES (1, 1, 0, 0, 0, 0, 0, 0, 0, 0, ?)", (date.today().strftime('%Y-%m-%d'),))
+        # Pinned Baseline: Pure 0 starting metrics on creation, 100 boss HP, 0 streak
+        c.execute("INSERT INTO character VALUES (1, 1, 0, 0, 0, 0, 0, 0, 0, 0, ?, 0, 0, 100)", (date.today().strftime('%Y-%m-%d'),))
+        # Call initial quest generator for Level 1
+        scale_quests_to_level(c, 1)
         
-        # Primary Objective Directives
-        c.execute("INSERT INTO quests (type, title, xp_reward, stat_type, stat_reward, deadline, completed) VALUES ('Fixed', '🌅 Sunlight Spawn (15m outdoor morning exposure)', 40, 'per', 2, 'Daily', 0)")
-        c.execute("INSERT INTO quests (type, title, xp_reward, stat_type, stat_reward, deadline, completed) VALUES ('Fixed', '🔒 System Lockdown (No late-night food loops past 11 PM)', 50, 'vit', 3, 'Daily', 0)")
-        c.execute("INSERT INTO quests (type, title, xp_reward, stat_type, stat_reward, deadline, completed) VALUES ('Fixed', '🏊 Physical Execution (Swim/Walk/Active Mobility)', 40, 'agi', 2, 'Daily', 0)")
-        c.execute("INSERT INTO quests (type, title, xp_reward, stat_type, stat_reward, deadline, completed) VALUES ('Fixed', '📈 Skill Tree Cultivation (45m System Design/Engineering)', 60, 'intel', 3, 'Daily', 0)")
     conn.commit()
     conn.close()
 
 init_db()
 
 # ==========================================
-# ⏱️ FEATURE 4: AUTOMATED MIDNIGHT CHRONO-SYNC
+# ⏱️ FEATURE 4: AUTOMATED MIDNIGHT CHRONO-SYNC & STREAK MANAGEMENT
 # ==========================================
 conn = sqlite3.connect(DB_FILE)
 char_data = pd.read_sql_query("SELECT * FROM character WHERE id=1", conn).iloc[0]
 conn.close()
 
-current_today = date.today().strftime('%Y-%m-%d')
-if char_data['last_login'] != current_today:
+current_today_str = date.today().strftime('%Y-%m-%d')
+current_today = date.today()
+
+if char_data['last_login'] != current_today_str:
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     
+    # Calculate streak preservation
+    last_login_date = datetime.strptime(char_data['last_login'], '%Y-%m-%d').date()
+    yesterday = current_today - timedelta(days=1)
+    
+    new_streak = int(char_data['streak'])
+    if last_login_date == yesterday:
+        new_streak += 1  # Streak preserved and increased
+    elif last_login_date < yesterday:
+        new_streak = 1   # Streak broken, reset back to 1
+        
     # Identify missed daily fixed goals before wiping
     c.execute("SELECT COUNT(*) FROM quests WHERE type='Fixed' AND completed=0")
     missed_count = c.fetchone()[0]
@@ -83,13 +124,16 @@ if char_data['last_login'] != current_today:
         c.execute("UPDATE character SET vit = MAX(0, vit - ?) WHERE id=1", (vit_damage,))
         # Flag persistent notice to show user upon logging in
         st.sidebar.error(f"🚨 MIDNIGHT CHRONO-SYNC PENALTY: You abandoned {missed_count} Daily Objectives yesterday. Vitality dropped by -{vit_damage} points.")
-        
-    # Automatic Daily Board Reset execution
+    
+    # Reset Gacha Draw & Daily Boss HP back to 100 for a fresh challenge
     c.execute("UPDATE quests SET completed=0 WHERE type='Fixed'")
-    c.execute("UPDATE character SET last_login=? WHERE id=1", (current_today,))
+    c.execute("UPDATE character SET last_login=?, streak=?, draw_today=0, boss_hp=100 WHERE id=1", (current_today_str, new_streak))
     conn.commit()
     conn.close()
     st.rerun()
+
+# --- STREAK MULTIPLIER MATH ---
+streak_multiplier = min(1.0 + (int(char_data['streak']) * 0.05), 1.50)
 
 # ==========================================
 # 👑 FEATURE 3: DYNAMIC TITLE COEFFICIENT ENGINE
@@ -100,6 +144,7 @@ def determine_system_title(char):
     if char['intel'] >= 25: return "🧠 System Architect"
     if char['str'] >= 20 and char['agi'] >= 20: return "⚔️ Vanguard Raider"
     if char['wealth'] >= 25: return "🪙 Guild Financier"
+    if char['streak'] >= 10: return "🔥 Unstoppable Hunter"
     if char['str'] == 0 and char['intel'] == 0 and char['wealth'] == 0: return "🥚 Unawakened E-Rank"
     return "🛡️ Active Hunter"
 
@@ -108,7 +153,6 @@ active_title = determine_system_title(char_data)
 # ==========================================
 # 📡 FEATURE 5: REMOTE WEBHOOK ROUTING GATEWAY
 # ==========================================
-# Parses direct HTTP requests sent externally via Telegram/Shortcuts automation tools
 if "log" in st.query_params and "api_key" in st.query_params:
     incoming_log = st.query_params["log"]
     incoming_token = st.query_params["api_key"]
@@ -127,6 +171,9 @@ st.markdown("""
     .quest-card { background-color: #111625; padding: 18px; border-radius: 10px; margin-bottom: 12px; border: 1px solid #1E293B; }
     .system-speech { background-color: #1E1B4B; border-left: 4px solid #818CF8; padding: 18px; border-radius: 6px; font-family: 'Courier New', monospace; color: #E0E7FF; }
     .gold-ticker { color: #F59E0B; font-size: 20px; font-weight: bold; font-family: monospace; }
+    .streak-container { display: flex; align-items: center; background: linear-gradient(135deg, #FF512F, #DD2476); padding: 8px 15px; border-radius: 8px; color: white; font-weight: bold; margin-bottom: 15px; }
+    .boss-frame { background-color: #1c0f1e; border: 2px solid #f43f5e; border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center; }
+    .rune-unlocked { background: radial-gradient(circle, rgba(129,140,248,0.2) 0%, rgba(15,19,34,1) 100%); border: 2px dashed #818cf8; border-radius: 12px; padding: 25px; text-align: center; }
     h1, h2, h3 { font-family: 'Courier New', monospace; color: #F8FAFC; letter-spacing: 1px; }
     .stButton>button { width: 100%; background-color: #1E293B; color: #F1F5F9; border: 1px solid #38BDF8; border-radius: 6px; }
     .stButton>button:hover { background-color: #38BDF8; color: #060913; box-shadow: 0 0 12px #38BDF8; }
@@ -149,17 +196,27 @@ all_stats_met = (
 if char_data['xp'] >= xp_needed and all_stats_met:
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("UPDATE character SET level = level + 1, xp = xp - ? WHERE id=1", (xp_needed,))
+    next_level = int(char_data['level']) + 1
+    c.execute("UPDATE character SET level = ?, xp = xp - ? WHERE id=1", (next_level, xp_needed))
+    
+    # AUTOMATIC CORE SCALING PROTOCOL RUN
+    scale_quests_to_level(c, next_level)
+    
     conn.commit()
     conn.close()
     st.balloons()
-    st.success(f"✨ ATTRIBUTE EVOLUTION COMPLETED: System advanced to Level {char_data['level'] + 1}!")
+    st.success(f"✨ ATTRIBUTE EVOLUTION COMPLETED: System advanced to Level {next_level}! All daily fixed quests have evolved!")
     st.rerun()
 
 # ==========================================
 # 🗺️ APPARATUS TABS INTERACTION INTERFACE
 # ==========================================
-tab_dashboard, tab_shop, tab_remote = st.tabs(["🛡️ STATUS MATRIX & DIRECTIVES", "🪙 SYSTEM SHOP & INVENTORY", "📡 REMOTE API GATEWAY"])
+tab_dashboard, tab_shop, tab_gacha, tab_remote = st.tabs([
+    "🛡️ STATUS MATRIX & DIRECTIVES", 
+    "🪙 SYSTEM SHOP & INVENTORY", 
+    "🔮 THE ORACLE'S RUNES (GACHA)",
+    "📡 REMOTE API GATEWAY"
+])
 
 # --- TAB 1: MAIN SYSTEM DASHBOARD ---
 with tab_dashboard:
@@ -168,6 +225,13 @@ with tab_dashboard:
     with col_left:
         st.markdown("<div class='status-frame'>", unsafe_allow_html=True)
         st.header(f"👤 STATUS FRAME // LVL {char_data['level']}")
+        
+        # Streak Container displaying active modifiers
+        st.markdown(f"""
+        <div class="streak-container">
+            🔥 ACTIVE LOGIN STREAK: {char_data['streak']} Days (Multiplier: {streak_multiplier:.2f}x XP)
+        </div>
+        """, unsafe_allow_html=True)
         
         st.markdown(f"**System Gold Reservoir:** <span class='gold-ticker'>🪙 {char_data['gold']} G</span>", unsafe_allow_html=True)
         
@@ -188,6 +252,20 @@ with tab_dashboard:
         st.bar_chart(chart_dataframe, color=["#38BDF8", "#F43F5E"])
         st.markdown("</div>", unsafe_allow_html=True)
 
+        # --- DYNAMIC BOSS BATTLE WINDOW ---
+        st.markdown("<div class='boss-frame'>", unsafe_allow_html=True)
+        st.subheader("👾 ACTIVE DAILY SYSTEM BOSS")
+        st.markdown("**'The Stagnation Leviathan'**")
+        
+        boss_hp_val = int(char_data['boss_hp'])
+        st.progress(max(0, min(boss_hp_val, 100)) / 100.0)
+        
+        if boss_hp_val <= 0:
+            st.markdown("<span style='color:#10B981; font-weight:bold;'>🏆 LEVIATHAN DEFEATED! Check in tomorrow for another raid drop.</span>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"**HP:** {boss_hp_val} / 100 — *Every Quest completed deals **25 DMG** to the Beast.*")
+        st.markdown("</div>", unsafe_allow_html=True)
+
     with col_right:
         st.header("📋 ACTIVE OBJECTIVE TREE")
         conn = sqlite3.connect(DB_FILE)
@@ -202,8 +280,11 @@ with tab_dashboard:
                 q_col1, q_col2 = st.columns([2.6, 1.4])
                 
                 with q_col1:
+                    # Scaling rewards with active streak multiplier
+                    scaled_xp = int(q['xp_reward'] * streak_multiplier)
+                    gold_reward = int(scaled_xp / 2)
                     st.markdown(f"**[{q['type']}]** {q['title']}")
-                    st.markdown(f"<span style='font-size:12px; color:#94A3B8;'>Rewards: +{q['xp_reward']} XP | +{int(q['xp_reward']/2)} GOLD</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span style='font-size:12px; color:#94A3B8;'>Rewards: +{scaled_xp} XP (with Multiplier) | +{gold_reward} GOLD</span>", unsafe_allow_html=True)
                 
                 with q_col2:
                     if st.button("Confirm Clear", key=f"btn_clear_{q['id']}"):
@@ -211,10 +292,21 @@ with tab_dashboard:
                         c = conn.cursor()
                         c.execute("UPDATE quests SET completed=1 WHERE id=?", (q['id'],))
                         db_stat = "intel" if q['stat_type'] == "int" else q['stat_type']
-                        gold_reward = int(q['xp_reward'] / 2)
                         
+                        # Apply adjusted stat and XP
                         c.execute(f"UPDATE character SET xp = xp + ?, {db_stat} = {db_stat} + ?, gold = gold + ? WHERE id=1", 
-                                  (q['xp_reward'], q['stat_reward'], gold_reward))
+                                  (scaled_xp, q['stat_reward'], gold_reward))
+                        
+                        # Hit Daily Boss for 25 damage
+                        new_boss_hp = max(0, int(char_data['boss_hp']) - 25)
+                        c.execute("UPDATE character SET boss_hp = ? WHERE id=1", (new_boss_hp,))
+                        
+                        # Defeating the boss bonus
+                        if new_boss_hp == 0 and int(char_data['boss_hp']) > 0:
+                            c.execute("UPDATE character SET gold = gold + 50 WHERE id=1")
+                            st.sidebar.balloons()
+                            st.sidebar.success("💥 BOSS DEFEATED! Received +50 G Slayer Bonus!")
+                        
                         conn.commit()
                         conn.close()
                         st.toast(f"Objective Verified: +{gold_reward} Gold added to cache.")
@@ -250,7 +342,12 @@ with tab_dashboard:
                         1. Calculate metric shifting arrays (-5 to +5) across all coefficients based on the user's report.
                         2. Award appropriate INT/STR/WTH points based on accomplishments, and generate positive experience multipliers.
                         3. If they mention late night screen loops, masturbation/dopamine failures, or procrastination, apply a major penalty to VIT and PER.
-                        4. Trigger a side quest object if they declare long term goals.
+                        4. DYNAMIC QUESTS: If they mention specific goals, failures, or milestones, generate an active side quest. 
+                           The difficulty rank, requirements, and deadlines of the side quest MUST scale based on the user's current Level ({char_data['level']}):
+                           - Level 1-2: E/D-Rank Quests (Simple habits, 100-150 XP, 3-5 days)
+                           - Level 3-4: C/B-Rank Quests (Multi-step structural shifts, 200-300 XP, 4-7 days)
+                           - Level 5+: A/S-Rank Quests (Extreme focus/milestones/financial blocks, 400-500+ XP, 7-14 days)
+                           The dynamic quest's title MUST start with the rank prefix, e.g., '[D-RANK QUEST] Clear microservice registry challenge'.
                         
                         Return JSON format ONLY:
                         {{
@@ -258,7 +355,7 @@ with tab_dashboard:
                             "xp_modification": 50,
                             "new_side_quest": {{
                                 "triggered": false,
-                                "title": "Infiltrate System Architecture Principles",
+                                "title": "[E-RANK QUEST] Infiltrate System Architecture Principles",
                                 "xp_reward": 120,
                                 "stat_type": "intel",
                                 "deadline": "{date.today().strftime('%Y-%m-%d')}"
@@ -283,8 +380,9 @@ with tab_dashboard:
                         ai_res = json.loads(cleaned_output)
                         mods = ai_res["stat_changes"]
                         
-                        f_xp = max(0, char_data['xp'] + ai_res["xp_modification"])
-                        gold_gained = max(0, int(ai_res["xp_modification"] / 2)) if ai_res["xp_modification"] > 0 else 0
+                        # Handle scaling XP with the current login streak
+                        computed_xp = int(ai_res["xp_modification"] * streak_multiplier)
+                        gold_gained = max(0, int(computed_xp / 2)) if computed_xp > 0 else 0
                         f_gold = char_data['gold'] + gold_gained
                         
                         f_str = max(0, char_data['str'] + mods.get("str", 0))
@@ -297,7 +395,7 @@ with tab_dashboard:
                         conn = sqlite3.connect(DB_FILE)
                         cursor = conn.cursor()
                         cursor.execute("UPDATE character SET xp=?, str=?, agi=?, vit=?, intel=?, per=?, wealth=?, gold=? WHERE id=1",
-                                       (f_xp, f_str, f_agi, f_vit, f_int, f_per, f_wth, f_gold))
+                                       (char_data['xp'] + computed_xp, f_str, f_agi, f_vit, f_int, f_per, f_wth, f_gold))
                         
                         sq = ai_res.get("new_side_quest", {})
                         if sq.get("triggered", False):
@@ -312,7 +410,7 @@ with tab_dashboard:
                     except Exception as e:
                         st.error(f"Execution Error Matrix Crash: {e}")
 
-# --- FEATURE 2: TAB 2: SYSTEM SHOP & INVENTORY ---
+# --- TAB 2: SYSTEM SHOP & INVENTORY ---
 with tab_shop:
     st.header("🪙 SYSTEM ACQUISITIONS TERMINAL")
     st.markdown(f"Available Balance Vector: <span class='gold-ticker'>🪙 {char_data['gold']} G</span>", unsafe_allow_html=True)
@@ -346,7 +444,7 @@ with tab_shop:
                         # Deduct asset currencies
                         c.execute("UPDATE character SET gold = gold - ? WHERE id=1", (item['cost'],))
                         c.execute("INSERT INTO purchases (item_name, cost, date_unlocked) VALUES (?, ?, ?)", 
-                                  (item['name'], item['cost'], current_today))
+                                  (item['name'], item['cost'], current_today_str))
                         conn.commit()
                         conn.close()
                         st.toast(f"Transaction Confirmed: Unlocked {item['name']}.", icon="🪙")
@@ -365,7 +463,61 @@ with tab_shop:
             for _, row in history.iterrows():
                 st.markdown(f"⚙️ **{row['item_name']}**<br><span style='font-size:11px; color:#64748B;'>Cleared on: {row['date_unlocked']} (-{row['cost']}G)</span><hr style='margin:5px 0;'>", unsafe_allow_html=True)
 
-# --- FEATURE 5: TAB 3: REMOTE GATEWAY TERMINAL ---
+# --- TAB 3: THE ORACLE'S RUNES (DAILY GACHA GATEWAY) ---
+with tab_gacha:
+    st.header("🔮 THE ORACLE'S RUNES")
+    st.caption("Unlock a singular randomized elemental system blessing every calendar day to accelerate your progression tree.")
+    
+    # Simple list of random gacha items
+    runes = [
+        {"name": "🌟 Architect's Core Insight", "stat": "intel", "bonus": 3, "xp": 100, "message": "Your mental clarity is boosted. Received +3 INT & +100 XP!"},
+        {"name": "💧 Clean Springs Purifier", "stat": "vit", "bonus": 4, "xp": 50, "message": "Your physical vessel purifies negative residue. Received +4 VIT & +50 XP!"},
+        {"name": "⚔️ Raider's Kinetic Velocity", "stat": "agi", "bonus": 3, "xp": 75, "message": "Kinetic energy sweeps your muscle fibers. Received +3 AGI & +75 XP!"},
+        {"name": "🪙 Wealth Generation Blessing", "stat": "wealth", "bonus": 3, "xp": 100, "message": "Your wealth collection metrics sharpen. Received +3 WTH & +100 XP!"},
+        {"name": "🎁 Divine System Chest", "stat": "gold", "bonus": 80, "xp": 150, "message": "A system chest unlocks extra resources. Received +80 Gold & +150 XP!"}
+    ]
+    
+    if int(char_data['draw_today']) == 0:
+        st.markdown("""
+        <div style='text-align: center; padding: 40px;'>
+            <h3>🔮 THE RUNE GATEWAY IS ACTIVE</h3>
+            <p style='color:#94A3B8;'>Gacha drawing is fully recharged. Roll once daily to receive a random attribute boost.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🔮 DRAW DAILY RUNE", key="draw_rune_btn"):
+            selected_rune = random.choice(runes)
+            conn = sqlite3.connect(DB_FILE)
+            c = conn.cursor()
+            
+            # Update draw today flag
+            c.execute("UPDATE character SET draw_today = 1 WHERE id=1")
+            
+            # Apply dynamic rewards based on selection
+            if selected_rune["stat"] == "gold":
+                c.execute("UPDATE character SET gold = gold + ?, xp = xp + ? WHERE id=1", (selected_rune["bonus"], selected_rune["xp"]))
+            else:
+                c.execute(f"UPDATE character SET {selected_rune['stat']} = {selected_rune['stat']} + ?, xp = xp + ? WHERE id=1", (selected_rune["bonus"], selected_rune["xp"]))
+            
+            # Log purchase entry for history tracking
+            c.execute("INSERT INTO purchases (item_name, cost, date_unlocked) VALUES (?, 0, ?)", 
+                      (f"Oracle Reward: {selected_rune['name']}", current_today_str))
+            
+            conn.commit()
+            conn.close()
+            st.balloons()
+            st.success(selected_rune["message"])
+            st.rerun()
+    else:
+        st.markdown(f"""
+        <div class="rune-unlocked">
+            <h3 style="color:#818cf8;">🔮 DAILY RUNIC CYCLE ALREADY SYNCED</h3>
+            <p style="color:#CBD5E1; margin: 10px 0;">You have already successfully claimed your rune of power today.</p>
+            <p style="font-size: 14px; color: #94A3B8;">The Gateway will recharge in your next midnight chronometrical loop.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+# --- TAB 4: REMOTE GATEWAY TERMINAL ---
 with tab_remote:
     st.header("📡 WEBHOOK TRANSMISSION GATEWAY")
     st.caption("Bypass the standard graphic web dashboard interface entirely. Sync telemetry natively from remote environments.")
