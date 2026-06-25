@@ -6,7 +6,10 @@ import random
 from datetime import datetime, date, timedelta
 import google.generativeai as genai
 
+# --- HARDCODED CREDENTIALS & CONFIG ---
+API_KEY = "AQ.Ab8RN6IGa7XyB4QpJNa_-M5vhSzHvq81uF4dKdHOXzYG7GOyag"
 DB_FILE = "aeon_persistent_vault.db"
+genai.configure(api_key=API_KEY)
 
 # ==========================================
 # 📈 QUEST SCALING CONTROLLER (BY LEVEL TIER)
@@ -34,7 +37,7 @@ def scale_quests_to_level(c, level):
     c.executemany("INSERT INTO quests (type, title, xp_reward, stat_type, stat_reward, deadline, completed) VALUES (?, ?, ?, ?, ?, ?, ?)", quests)
 
 # ==========================================
-# 🗄️ DATABASE MANAGEMENT LAYER (SCALING MATRIX UPDATE)
+# 🗄️ DATABASE MANAGEMENT LAYER
 # ==========================================
 def init_db(force_reset=False):
     conn = sqlite3.connect(DB_FILE)
@@ -57,7 +60,7 @@ def init_db(force_reset=False):
     c.execute('''CREATE TABLE IF NOT EXISTS purchases 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, item_name TEXT, cost INTEGER, date_unlocked TEXT)''')
     
-    # --- AUTO-MIGRATION LAYER (Adds trackers seamlessly) ---
+    # --- AUTO-MIGRATION LAYER (Injects columns seamlessly on older DB states) ---
     c.execute("PRAGMA table_info(character)")
     columns = [col[1] for col in c.fetchall()]
     
@@ -80,9 +83,7 @@ def init_db(force_reset=False):
 
     c.execute("SELECT COUNT(*) FROM character")
     if c.fetchone()[0] == 0:
-        # Pinned Baseline: Pure 0 starting metrics on creation, 100 boss HP, 0 streak
         c.execute("INSERT INTO character VALUES (1, 1, 0, 0, 0, 0, 0, 0, 0, 0, ?, 0, 0, 100)", (date.today().strftime('%Y-%m-%d'),))
-        # Call initial quest generator for Level 1
         scale_quests_to_level(c, 1)
         
     conn.commit()
@@ -91,7 +92,7 @@ def init_db(force_reset=False):
 init_db()
 
 # ==========================================
-# ⏱️ FEATURE 4: AUTOMATED MIDNIGHT CHRONO-SYNC & STREAK MANAGEMENT
+# ⏱️ AUTOMATED MIDNIGHT CHRONO-SYNC & STREAKS
 # ==========================================
 conn = sqlite3.connect(DB_FILE)
 char_data = pd.read_sql_query("SELECT * FROM character WHERE id=1", conn).iloc[0]
@@ -136,7 +137,7 @@ if char_data['last_login'] != current_today_str:
 streak_multiplier = min(1.0 + (int(char_data['streak']) * 0.05), 1.50)
 
 # ==========================================
-# 👑 FEATURE 3: DYNAMIC TITLE COEFFICIENT ENGINE
+# 👑 DYNAMIC TITLE COEFFICIENT ENGINE
 # ==========================================
 def determine_system_title(char):
     if char['level'] >= 5: return "👑 Shadow Monarch"
@@ -151,7 +152,7 @@ def determine_system_title(char):
 active_title = determine_system_title(char_data)
 
 # ==========================================
-# 📡 FEATURE 5: REMOTE WEBHOOK ROUTING GATEWAY
+# 📡 REMOTE WEBHOOK ROUTING GATEWAY
 # ==========================================
 if "log" in st.query_params and "api_key" in st.query_params:
     incoming_log = st.query_params["log"]
@@ -159,7 +160,7 @@ if "log" in st.query_params and "api_key" in st.query_params:
     st.info("📡 Incoming remote execution request intercepted. Processing neural thread...")
 
 # ==========================================
-# 🎨 RE-ENGINEERED IMMERSIVE UI STYLING
+# 🎨 IMMERSIVE RPG UI STYLING
 # ==========================================
 st.set_page_config(page_title="AEON: Monarch Evolution Chronicles", page_icon="⚡", layout="wide")
 st.markdown("""
@@ -187,12 +188,19 @@ st.markdown("""
     .gold-ticker { color: #F59E0B; font-size: 20px; font-weight: bold; font-family: monospace; }
     .streak-container { display: flex; align-items: center; background: linear-gradient(135deg, #FF512F, #DD2476); padding: 8px 15px; border-radius: 8px; color: white; font-weight: bold; margin-bottom: 15px; }
     
+    /* Custom Chrono Reset Widget */
+    .chrono-container { background: linear-gradient(135deg, #0f172a, #1e1b4b); border: 1px solid #818cf8; padding: 10px 15px; border-radius: 8px; color: #e0e7ff; font-family: monospace; font-weight: bold; margin-bottom: 15px; text-align: center; }
+    
     /* Custom Boss Combat Section */
     .boss-frame { background-color: #1c0f1e; border: 2px solid #f43f5e; border-radius: 12px; padding: 20px; margin-top: 20px; text-align: center; box-shadow: 0 0 15px rgba(244, 63, 94, 0.2); }
     .boss-health-bar { height: 22px; background-color: #2D142C; border: 1px solid #F43F5E; border-radius: 6px; position: relative; overflow: hidden; margin: 10px 0; }
     .boss-health-fill { height: 100%; background: linear-gradient(to right, #9B1C31, #EF4444); width: 100%; transition: width 0.5s ease; }
     .boss-health-text { position: absolute; width: 100%; text-align: center; top: 0; left: 0; line-height: 22px; font-weight: bold; color: white; font-family: monospace; }
     
+    /* Custom Rune Cards Styling */
+    .rune-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 15px; }
+    .rune-item-card { background: #111625; border: 1px solid #1e293b; border-radius: 8px; padding: 12px; text-align: center; transition: all 0.2s; }
+    .rune-item-card:hover { border-color: #818cf8; transform: translateY(-2px); }
     .rune-unlocked { background: radial-gradient(circle, rgba(129,140,248,0.2) 0%, rgba(15,19,34,1) 100%); border: 2px dashed #818cf8; border-radius: 12px; padding: 25px; text-align: center; }
     h1, h2, h3 { font-family: 'Courier New', monospace; color: #F8FAFC; letter-spacing: 1px; }
     
@@ -201,7 +209,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# Upgraded premium name display
+# Main Title display
 st.title("🔥 AEON // MONARCH EVOLUTION CHRONICLES")
 st.markdown(f"Target Sync: **ANUL AGRAWAL** | Assigned Title: <span class='title-badge'>{active_title}</span>", unsafe_allow_html=True)
 
@@ -220,23 +228,12 @@ if char_data['xp'] >= xp_needed and all_stats_met:
     c = conn.cursor()
     next_level = int(char_data['level']) + 1
     c.execute("UPDATE character SET level = ?, xp = xp - ? WHERE id=1", (next_level, xp_needed))
-    
-    # AUTOMATIC CORE SCALING PROTOCOL RUN
     scale_quests_to_level(c, next_level)
-    
     conn.commit()
     conn.close()
     st.balloons()
     st.success(f"✨ ATTRIBUTE EVOLUTION COMPLETED: System advanced to Level {next_level}! All daily fixed quests have evolved!")
     st.rerun()
-
-# ==========================================
-# 🛡️ SYSTEM KEY INTEGRATION AUTOMATION
-# ==========================================
-# Automated secrets fallback so you never have to re-enter your key!
-gemini_api_key = ""
-if "GEMINI_API_KEY" in st.secrets:
-    gemini_api_key = st.secrets["GEMINI_API_KEY"]
 
 # ==========================================
 # 🗺️ APPARATUS TABS INTERACTION INTERFACE
@@ -264,28 +261,37 @@ with tab_dashboard:
         </div>
         """, unsafe_allow_html=True)
         
+        # CALCULATE REMAINING TIME TO MIDNIGHT RESET (CHRONO STATUS)
+        now = datetime.now()
+        midnight = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
+        time_remaining = midnight - now
+        hours, remainder = divmod(time_remaining.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        st.markdown(f"""
+        <div class="chrono-container">
+            ⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: {hours:02d}h {minutes:02d}m {seconds:02d}s
+        </div>
+        """, unsafe_allow_html=True)
+        
         st.markdown(f"**System Gold Reservoir:** <span class='gold-ticker'>🪙 {char_data['gold']} G</span>", unsafe_allow_html=True)
         
         xp_progress = min(float(char_data['xp'] / xp_needed), 1.0)
         st.write(f"**Required Progress Vector (XP):** {char_data['xp']} / {xp_needed}")
         st.progress(xp_progress)
         
-        # --- EXOTIC CUSTOM PROGRESSION GRIDS (REPLACES STREAMLIT BAR CHART) ---
         st.markdown("### 📊 RPG ATTRIBUTE CALIBRATION PANEL")
-        st.caption(f"Current Level Gating Limit: **{stat_gate}** points. Red marker designates mandatory gate breakthrough lines.")
+        st.caption(f"Current Level Gating Limit: **{stat_gate}** points. Red/Green marker designates mandatory gate breakthrough lines.")
         
-        # Helper list of attributes with names, values, colors, and gate values
         attributes = [
-            {"label": "🏋️ STRENGTH (STR)", "val": char_data['str'], "color": "linear-gradient(90deg, #475569, #94A3B8)"},
-            {"label": "⚡ AGILITY (AGI)", "val": char_data['agi'], "color": "linear-gradient(90deg, #059669, #34D399)"},
-            {"label": "❤️ VITALITY (VIT)", "val": char_data['vit'], "color": "linear-gradient(90deg, #DC2626, #F87171)"},
-            {"label": "🧠 INTELLIGENCE (INT)", "val": char_data['intel'], "color": "linear-gradient(90deg, #4F46E5, #818CF8)"},
-            {"label": "👁️ PERCEPTION (PER)", "val": char_data['per'], "color": "linear-gradient(90deg, #0891B2, #22D3EE)"},
-            {"label": "🪙 WEALTH CAPACITY (WTH)", "val": char_data['wealth'], "color": "linear-gradient(90deg, #D97706, #FBBF24)"}
+            {"label": "🏋️ STRENGTH (STR)", "val": char_data['str'], "color": "linear-gradient(90deg, #475569, #94A3B8)", "db": "str"},
+            {"label": "⚡ AGILITY (AGI)", "val": char_data['agi'], "color": "linear-gradient(90deg, #059669, #34D399)", "db": "agi"},
+            {"label": "❤️ VITALITY (VIT)", "val": char_data['vit'], "color": "linear-gradient(90deg, #DC2626, #F87171)", "db": "vit"},
+            {"label": "🧠 INTELLIGENCE (INT)", "val": char_data['intel'], "color": "linear-gradient(90deg, #4F46E5, #818CF8)", "db": "intel"},
+            {"label": "👁️ PERCEPTION (PER)", "val": char_data['per'], "color": "linear-gradient(90deg, #0891B2, #22D3EE)", "db": "per"},
+            {"label": "🪙 WEALTH CAPACITY (WTH)", "val": char_data['wealth'], "color": "linear-gradient(90deg, #D97706, #FBBF24)", "db": "wealth"}
         ]
         
         for attr in attributes:
-            # We map 0-100% relative to a dynamic scale. Let's make max scale = max(stat_gate * 1.5, attr['val'])
             max_scale = max(int(stat_gate * 1.5), attr['val'], 1)
             fill_pct = min(100, int((attr['val'] / max_scale) * 100))
             gate_pct = min(100, int((stat_gate / max_scale) * 100))
@@ -306,7 +312,7 @@ with tab_dashboard:
             
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # --- DYNAMIC BOSS BATTLE WINDOW ---
+        # --- DYNAMIC BOSS BATTLE ---
         st.markdown("<div class='boss-frame'>", unsafe_allow_html=True)
         st.subheader("👾 ACTIVE DAILY SYSTEM BOSS")
         st.markdown("**'The Stagnation Leviathan'**")
@@ -337,12 +343,10 @@ with tab_dashboard:
             st.info("Directives cleared. Complete neural text logs below to trigger dynamic side quests.")
         else:
             for _, q in active_quests.iterrows():
-                # Scale rewards with streak multipliers explicitly
                 scaled_xp = int(q['xp_reward'] * streak_multiplier)
                 gold_reward = int(scaled_xp / 2)
                 bonus_xp_only = scaled_xp - q['xp_reward']
                 
-                # --- IMMERSIVE QUEST CARD OVERHAUL ---
                 st.markdown(f"""
                 <div class='quest-card'>
                     <div class="quest-title-text">[{q['type']}] {q['title']}</div>
@@ -357,22 +361,18 @@ with tab_dashboard:
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Action Buttons are kept as native Streamlit elements right below the card for complete stability
                 if st.button("Confirm Objective Cleared", key=f"btn_clear_{q['id']}"):
                     conn = sqlite3.connect(DB_FILE)
                     c = conn.cursor()
                     c.execute("UPDATE quests SET completed=1 WHERE id=?", (q['id'],))
                     db_stat = "intel" if q['stat_type'] == "int" else q['stat_type']
                     
-                    # Apply adjusted stat and XP
                     c.execute(f"UPDATE character SET xp = xp + ?, {db_stat} = {db_stat} + ?, gold = gold + ? WHERE id=1", 
                               (scaled_xp, q['stat_reward'], gold_reward))
                     
-                    # Hit Daily Boss for 25 damage
                     new_boss_hp = max(0, int(char_data['boss_hp']) - 25)
                     c.execute("UPDATE character SET boss_hp = ? WHERE id=1", (new_boss_hp,))
                     
-                    # Defeating the boss bonus
                     if new_boss_hp == 0 and int(char_data['boss_hp']) > 0:
                         c.execute("UPDATE character SET gold = gold + 50 WHERE id=1")
                         st.sidebar.balloons()
@@ -386,23 +386,14 @@ with tab_dashboard:
 
         st.markdown("---")
         st.header("🔮 COGNITIVE SYNAPSE LOG TERMINAL")
-        
-        # Key fallback management UI
-        if gemini_api_key:
-            st.success("🔒 System Synchronization Security Token initialized dynamically from st.secrets.")
-            active_key = gemini_api_key
-        else:
-            active_key = st.text_input("Enter Neural Authentication String (Gemini API Key)", type="password")
-            
         raw_log = st.text_area("Dump processing logs here:", height=110, placeholder="Document raw daily telemetry configurations...")
         
         if st.button("Execute Core Analysis Run"):
-            if not active_key or not raw_log:
-                st.error("Missing input parameters. Supply valid credentials and log context.")
+            if not raw_log:
+                st.error("Missing input parameters. Supply log context.")
             else:
                 with st.spinner("Analyzing semantic structures... Updating database matrix..."):
                     try:
-                        genai.configure(api_key=active_key)
                         current_matrix_payload = {
                             "level": int(char_data['level']), "str": int(char_data['str']), "agi": int(char_data['agi']),
                             "vit": int(char_data['vit']), "intel": int(char_data['intel']), "per": int(char_data['per']),
@@ -419,7 +410,7 @@ with tab_dashboard:
                         TASK SPECIFICATIONS:
                         1. Calculate metric shifting arrays (-5 to +5) across all coefficients based on the user's report.
                         2. Award STR (Strength) when physical exertion/workouts/gym/pushups/swimming are logged.
-                        3. Award WTH (Wealth) when financial discipline (mutual funds target met, overtime, savings, resisting junk food apps) is mentioned.
+                        3. Award WTH (Wealth) when financial discipline (mutual funds target met, savings, overtime, avoiding late food apps) is mentioned.
                         4. If they mention late night screen loops, masturbation/dopamine failures, or procrastination, apply a major penalty to VIT and PER.
                         5. DYNAMIC QUESTS: If they mention specific goals, failures, or milestones, generate an active side quest. 
                            The difficulty rank, requirements, and deadlines of the side quest MUST scale based on the user's current Level ({char_data['level']}):
@@ -442,12 +433,11 @@ with tab_dashboard:
                             "system_directive": "Your strict commentary statement here."
                         }}
                         """
-                        model = genai.GenerativeModel('gemini-1.5-flash')
+                        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
                         response = model.generate_content(system_prompt)
                         
                         cleaned_output = response.text.strip()
                         
-                        # Fix parsing bug by constructing triple backticks dynamically
                         ticks = "``" + "`"
                         json_tag = ticks + "json"
                         
@@ -459,7 +449,6 @@ with tab_dashboard:
                         ai_res = json.loads(cleaned_output)
                         mods = ai_res["stat_changes"]
                         
-                        # Handle scaling XP with the current login streak
                         computed_xp = int(ai_res["xp_modification"] * streak_multiplier)
                         gold_gained = max(0, int(computed_xp / 2)) if computed_xp > 0 else 0
                         f_gold = char_data['gold'] + gold_gained
@@ -495,7 +484,6 @@ with tab_shop:
     st.markdown(f"Available Balance Vector: <span class='gold-ticker'>🪙 {char_data['gold']} G</span>", unsafe_allow_html=True)
     st.caption("Exchange your hard earned performance gold tokens to license real world behavioral allowances.")
     
-    # Pre-defined system economy shop blueprints
     shop_items = [
         {"name": "🎬 Anime/Streaming Exertion License (1 Hour Access)", "cost": 100, "desc": "Unlocks legal system authority to view 1 hour of active media content guilt-free."},
         {"name": "🍕 High-Dopamine Cheat Meal Dispensation", "cost": 250, "desc": "Authorizes a single non-standard vegetarian meal option without structural penalty logging."},
@@ -520,7 +508,6 @@ with tab_shop:
                     if st.button(f"Purchase ({item['cost']} G)", key=f"shop_{item['name']}"):
                         conn = sqlite3.connect(DB_FILE)
                         c = conn.cursor()
-                        # Deduct asset currencies
                         c.execute("UPDATE character SET gold = gold - ? WHERE id=1", (item['cost'],))
                         c.execute("INSERT INTO purchases (item_name, cost, date_unlocked) VALUES (?, ?, ?)", 
                                   (item['name'], item['cost'], current_today_str))
@@ -547,20 +534,35 @@ with tab_gacha:
     st.header("🔮 THE ORACLE'S RUNES")
     st.caption("Unlock a singular randomized elemental system blessing every calendar day to accelerate your progression tree.")
     
-    # Simple list of random gacha items
     runes = [
-        {"name": "🌟 Architect's Core Insight", "stat": "intel", "bonus": 3, "xp": 100, "message": "Your mental clarity is boosted. Received +3 INT & +100 XP!"},
-        {"name": "💧 Clean Springs Purifier", "stat": "vit", "bonus": 4, "xp": 50, "message": "Your physical vessel purifies negative residue. Received +4 VIT & +50 XP!"},
-        {"name": "⚔️ Raider's Kinetic Velocity", "stat": "agi", "bonus": 3, "xp": 75, "message": "Kinetic energy sweeps your muscle fibers. Received +3 AGI & +75 XP!"},
-        {"name": "🪙 Wealth Generation Blessing", "stat": "wealth", "bonus": 3, "xp": 100, "message": "Your wealth collection metrics sharpen. Received +3 WTH & +100 XP!"},
-        {"name": "🎁 Divine System Chest", "stat": "gold", "bonus": 80, "xp": 150, "message": "A system chest unlocks extra resources. Received +80 Gold & +150 XP!"}
+        {"name": "🌟 Architect's Insight", "stat": "intel", "bonus": 3, "xp": 100, "message": "Your mental clarity is boosted. Received +3 INT & +100 XP!"},
+        {"name": "💧 Springs Purifier", "stat": "vit", "bonus": 4, "xp": 50, "message": "Your physical vessel purifies negative residue. Received +4 VIT & +50 XP!"},
+        {"name": "⚔️ Raider's Velocity", "stat": "agi", "bonus": 3, "xp": 75, "message": "Kinetic energy sweeps your muscle fibers. Received +3 AGI & +75 XP!"},
+        {"name": "🪙 Wealth Blessing", "stat": "wealth", "bonus": 3, "xp": 100, "message": "Your wealth collection metrics sharpen. Received +3 WTH & +100 XP!"},
+        {"name": "🎁 Divine Chest", "stat": "gold", "bonus": 80, "xp": 150, "message": "A system chest unlocks extra resources. Received +80 Gold & +150 XP!"}
     ]
+    
+    # EXOTIC CLARITY ADDITION: Render available blessings in a beautiful grid so the mechanism is crystal clear
+    st.markdown("### 🎲 AVAILABLE BLESSINGS IN THE RUNIC POOL")
+    st.markdown("<div class='rune-grid'>", unsafe_allow_html=True)
+    for r in runes:
+        st.markdown(f"""
+        <div class="rune-item-card">
+            <div style="font-size: 24px; margin-bottom: 5px;">{r['name'].split()[0]}</div>
+            <div style="font-weight: bold; color: #CBD5E1; font-size: 13px;">{r['name']}</div>
+            <div style="font-family: monospace; font-size: 11px; color: #38BDF8; margin-top: 4px;">
+                +{r['bonus']} {r['stat'].upper()}<br>+{r['xp']} XP
+            </div>
+            <div style="font-size: 10px; color: #64748B; margin-top: 3px;">Drop Chance: 20%</div>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown("</div><br>", unsafe_allow_html=True)
     
     if int(char_data['draw_today']) == 0:
         st.markdown("""
-        <div style='text-align: center; padding: 40px;'>
-            <h3>🔮 THE RUNE GATEWAY IS ACTIVE</h3>
-            <p style='color:#94A3B8;'>Gacha drawing is fully recharged. Roll once daily to receive a random attribute boost.</p>
+        <div style='text-align: center; padding: 20px;'>
+            <h3 style="color: #38BDF8;">🔮 THE RUNE GATEWAY IS ACTIVE</h3>
+            <p style='color:#94A3B8; font-size: 14px;'>Gacha drawing is fully recharged. Roll once daily to receive a random attribute boost.</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -569,16 +571,13 @@ with tab_gacha:
             conn = sqlite3.connect(DB_FILE)
             c = conn.cursor()
             
-            # Update draw today flag
             c.execute("UPDATE character SET draw_today = 1 WHERE id=1")
             
-            # Apply dynamic rewards based on selection
             if selected_rune["stat"] == "gold":
                 c.execute("UPDATE character SET gold = gold + ?, xp = xp + ? WHERE id=1", (selected_rune["bonus"], selected_rune["xp"]))
             else:
                 c.execute(f"UPDATE character SET {selected_rune['stat']} = {selected_rune['stat']} + ?, xp = xp + ? WHERE id=1", (selected_rune["bonus"], selected_rune["xp"]))
             
-            # Log purchase entry for history tracking
             c.execute("INSERT INTO purchases (item_name, cost, date_unlocked) VALUES (?, 0, ?)", 
                       (f"Oracle Reward: {selected_rune['name']}", current_today_str))
             
@@ -592,7 +591,7 @@ with tab_gacha:
         <div class="rune-unlocked">
             <h3 style="color:#818cf8;">🔮 DAILY RUNIC CYCLE ALREADY SYNCED</h3>
             <p style="color:#CBD5E1; margin: 10px 0;">You have already successfully claimed your rune of power today.</p>
-            <p style="font-size: 14px; color: #94A3B8;">The Gateway will recharge in your next midnight chronometrical loop.</p>
+            <p style="font-size: 14px; color: #94A3B8;">The Gateway will recharge in your next midnight chronometrical loop (see countdown on Dashboard).</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -604,12 +603,11 @@ with tab_forge:
     forge_req = st.text_area("What modular system expansion or graphic asset would you like to install?", placeholder="e.g., 'Add a deep water hydration tracking widget to the dashboard panel that awards +5 VIT for clearing 3L.'")
     
     if st.button("Initialize System Blueprint Generation"):
-        if not active_key or not forge_req:
-            st.error("Expansion compilation failed: Authentication string or requirements empty.")
+        if not forge_req:
+            st.error("Expansion compilation failed: Requirements empty.")
         else:
-            with st.spinner("Compiling structural blueprint layers... Reading Canvas interfaces..."):
+            with st.spinner("Compiling structural blueprint layers..."):
                 try:
-                    genai.configure(api_key=active_key)
                     forge_prompt = f"""
                     You are AEON Forge, a world-class Streamlit and Python engineer. 
                     The user Anul Agrawal has requested a new feature for his dashboard app.
@@ -620,7 +618,8 @@ with tab_forge:
                     TASK: Generate the complete, optimized code patch or instructions that they can safely replace in their app.
                     Keep the style cohesive, clean, and highly robust.
                     """
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    # CORRECTION: Explicitly routed to globally declared API_KEY configuration to guarantee authorization
+                    model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
                     response = model.generate_content(forge_prompt)
                     
                     st.markdown("### 🧬 PATCH GENERATED SUCCESSFULLY")
@@ -639,8 +638,7 @@ with tab_remote:
     You can trigger quick stat tracking or input logs directly without ever opening this browser dashboard page. Set up an automation shortcut on your phone or configuration code script to ping your deployed web application URL structured with URL query params:
     """)
     
-    # Generating instructions dynamically based on platform context
-    example_url = "https://your-app-url.streamlit.app/?api_key=YOUR_GEMINI_KEY&log=I completed 45m of system design architecture and walked outside."
+    example_url = "https://aeon-forge.streamlit.app/?api_key=YOUR_GEMINI_KEY&log=I completed 45m of system design architecture and walked outside."
     st.code(example_url, language="text")
     
     st.markdown("""
@@ -656,7 +654,6 @@ with tab_remote:
             st.error("Simulation failed: Pipeline missing key credentials or execution payload.")
         else:
             st.success("Incoming request packet successfully parsed by AEON Gateway Matrix!")
-            # Code routes automatically to the primary internal processing block by mimicking entry values
             st.info("Reroute to processing engine initialized... Press 'Execute Core Analysis Run' above inside the Status tab with this payload to review.")
 
 # ==========================================
