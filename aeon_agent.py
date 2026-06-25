@@ -7,7 +7,13 @@ from datetime import datetime, date, timedelta
 import google.generativeai as genai
 
 # --- HARDCODED CREDENTIALS & CONFIG ---
-API_KEY = "AQ.Ab8RN6IGa7XyB4QpJNa_-M5vhSzHvq81uF4dKdHOXzYG7GOyag"
+#API_KEY = "AQ.Ab8RN6IGa7XyB4QpJNa_-M5vhSzHvq81uF4dKdHOXzYG7GOyag"
+
+try:
+    API_KEY = st.secrets["AQ.Ab8RN6IGa7XyB4QpJNa_-M5vhSzHvq81uF4dKdHOXzYG7GOyag"]
+except KeyError:
+    st.error("Missing 'API_KEY' in Streamlit Secrets. Please configure your secrets to continue.")
+    st.stop()
 DB_FILE = "aeon_persistent_vault.db"
 genai.configure(api_key=API_KEY)
 
