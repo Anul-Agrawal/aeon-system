@@ -261,27 +261,20 @@ with tab_dashboard:
         </div>
         """, unsafe_allow_html=True)
         
-        # CALCULATE REMAINING TIME TO MIDNIGHT RESET (CHRONO STATUS)
-        # CALCULATE REMAINING TIME TO MIDNIGHT RESET (CHRONO STATUS)
-        now = datetime.now()
-        midnight = datetime.combine(now.date() + timedelta(days=1), datetime.min.time())
-        time_remaining = midnight - now
-        hours, remainder = divmod(time_remaining.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        
+        # CLIENT-SIDE DYNAMIC LOCAL TIME COUNTDOWN (Prevents Server UTC Mismatch & Ticks Continuously)
         st.markdown(f"""
-        <div class="chrono-container" id="chrono-sync-timer">
-            ⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: {hours:02d}h {minutes:02d}m {seconds:02d}s
+        <div class="chrono-container" id="local-chrono-timer">
+            ⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: Calculating...
         </div>
         <script>
-            function updateCountdown() {{
+            function updateLocalTimer() {{
                 const now = new Date();
                 const midnight = new Date();
-                midnight.setHours(24, 0, 0, 0); // Next midnight
+                midnight.setHours(24, 0, 0, 0); // User's Local Midnight (12:00 AM)
                 
                 const diff = midnight - now;
                 if (diff <= 0) {{
-                    document.getElementById('chrono-sync-timer').innerHTML = "⏱️ CHRONO-SYNC TRIGGERED! Please refresh.";
+                    document.getElementById('local-chrono-timer').innerHTML = "⏱️ CHRONO-SYNC ACTIVE! Please refresh to update boards.";
                     return;
                 }}
                 
@@ -291,14 +284,13 @@ with tab_dashboard:
                 
                 const pad = (num) => String(num).padStart(2, '0');
                 
-                const timerEl = document.getElementById('chrono-sync-timer');
-                if (timerEl) {{
-                    timerEl.innerHTML = `⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: ${{pad(hours)}}h ${{pad(minutes)}}m ${{pad(seconds)}}s`;
+                const timerElement = document.getElementById('local-chrono-timer');
+                if (timerElement) {{
+                    timerElement.innerHTML = `⏱️ SYSTEM MIDNIGHT CHRONO-SYNC COUNTDOWN: ${{pad(hours)}}h ${{pad(minutes)}}m ${{pad(seconds)}}s`;
                 }}
             }}
-            // Execute tick immediately and then interval every second
-            updateCountdown();
-            setInterval(updateCountdown, 1000);
+            updateLocalTimer();
+            setInterval(updateLocalTimer, 1000);
         </script>
         """, unsafe_allow_html=True)
         
